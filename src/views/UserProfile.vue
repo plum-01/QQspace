@@ -4,10 +4,10 @@
         <div class="col-3">
           <!-- v-bind:绑定属性，v-on || @：绑定事件 -->
           <UserProfileInfo @follow="follow" @unfollow="unfollow" v-bind:user="user" />
-          <UserProfileWrite @post_a_post="post_a_post" />
+          <UserProfileWrite v-if="is_me" @post_a_post="post_a_post" />
         </div>
         <div class="col-9">
-          <UserProfilePosts v-bind:post="post" />
+          <UserProfilePosts v-bind:post="post" @delete_a_post="delete_a_post" />
         </div>
       </div>
     </ConTent>
@@ -20,6 +20,9 @@
   import UserProfileWrite from '@/components/UserProfileWrite.vue';
   import { reactive } from 'vue';
   import { useRoute } from 'vue-router'
+  import $ from 'jquery'
+  import { useStore } from 'vuex';
+  import { computed } from 'vue';
 
   export default {
     name: 'UserProfile',
@@ -31,44 +34,50 @@
     },
     setup: () => {
       const route = useRoute();
-      const userId = route.params.userId
-      console.log(route.params.userId)
-
+      const userId = parseInt(route.params.userId);
+      const store = useStore();
       // 定义变量：ref：变量可重新赋值，接收各种类型；reactive：不可改变，接收对象
-      const user = reactive({
-        id: 1,
-        username: 'Plum Li',
-        firstname: 'Plum',
-        lastname: 'Li',
-        fans: 123,
-        is_followed: true,
-      });
+      const user = reactive({});
+      const post = reactive({});
 
-      const post = reactive({
-        count: 3,
-        posts: [
-          {
-            id: 1,
-            userid: 1,
-            content: "哈哈哈哈哈"
-          },
-          {
-            id: 2,
-            userid: 1,
-            content: "啦啦啦啦啦",
-          },
-          {
-            id: 2,
-            userid: 1,
-            content: "O(∩_∩)O哈哈~",
-          }
-        ]
-      });
+      /**获取用户信息 */
+      $.ajax({
+        url: 'https://app165.acapp.acwing.com.cn/myspace/getinfo/',
+        type: 'GET',
+        data: {
+          user_id: userId,
+        },
+        headers: {
+          'Authorization': "Bearer " + store.state.user.access,
+        },
+        success(res) {
+          user.id = res.id,
+          user.username = res.username,
+          user.photo = res.photo,
+          user.followerCount = res.followerCount,
+          user.is_followed = res.is_followed
+        }
+      })
+
+      $.ajax({
+        url: 'https://app165.acapp.acwing.com.cn/myspace/post/',
+        type: 'GET',
+        data: {
+          user_id: userId,
+        },
+        headers: {
+          'Authorization': "Bearer " + store.state.user.access,
+        },
+        success(res) {
+          post.count = res.length,
+          post.posts = res;
+        }
+      })
 
       const follow = () => {
         if (user.is_followed) return;
         else (
-          user.fans ++,
+          user.followerCount ++,
           user.is_followed = true
         )
       };
@@ -76,10 +85,10 @@
       const unfollow = () => {
         if (!user.is_followed) return;
         else (
-          user.fans --,
+          user.followerCount --,
           user.is_followed = false
         )
-      }
+      };
 
       const post_a_post = (content) => {
         if (content.replace(/[ ]|[\r\n]/g,"").length == 0) alert('不能为空！')
@@ -93,13 +102,22 @@
         }
       };
 
+      const delete_a_post = post_id => {
+        post.posts = post.posts.filter(post => post.id !== post_id)
+        post.count = post.posts.length
+      };
+
+      let is_me = computed(() => userId === store.state.user.id)
+
       return {
         user,
         post,
         userId,
         follow,
         unfollow,
-        post_a_post
+        post_a_post,
+        delete_a_post,
+        is_me
       }
     }
   }
